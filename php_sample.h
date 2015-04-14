@@ -32,7 +32,7 @@ ZEND_BEGIN_MODULE_GLOBALS(sample)
 
 ZEND_END_MODULE_GLOBALS(sample)
 ZEND_DECLARE_MODULE_GLOBALS(sample)
-#define FUNCTION_BACKUPS XG(function_backups)
+// #define FUNCTION_BACKUPS XG(function_backups)
 #define FUNCTION_HOOKS XG(function_hooks)
 
 #endif /* PHP_SAMPLE_H */
