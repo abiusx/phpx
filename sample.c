@@ -2,8 +2,26 @@
 #include "zend_extensions.h"
 
 //TODO: code coverage from xdebug
-//TODO: hook classes, like PDO
 //TODO: move minit stuff to rinit, or hooks remain!, or just make hook hashes per request
+//TODO: a final check to make sure there are no leaks.
+/**
+ * For class override, we just need to rename the original class, e.g PDO to PDO_
+ * using class_rename. Then we redefine the original class, inherit the new name (e.g PDO_)
+ * and override every method we want.
+ *
+ * Function overrite can not be that easy, as predefined functions in PHP
+ * are first compiled, and if we attempt to define a new one, no matter it really exists or not,
+ * we get "Cannot redeclare ..." error.
+ *
+ * That's why we use function_override("original_php_func","our_func") to override the PHP function.
+ * This makes our_func called whenever original_php_func is accessed. To access the original function,
+ * we can use original_php_func_original (appended with _original).
+ *
+ * This all can be reversed by function_restore("original_php_func");
+ *
+ * Take a look at sample.php for more examples.
+ */
+
 PHP_FUNCTION(substring_distance)
 {
     char *str1,*str2;
@@ -17,39 +35,6 @@ PHP_FUNCTION(substring_distance)
     RETURN_LONG(limit);
 }
 
-PHP_FUNCTION(sample_hello_world)
-{
-    long range;
-    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC,"l",&range)==FAILURE)
-        RETURN_NULL();
-
-    long sum=0;
-    for (long i=0;i<range;++i)
-        sum+=i%3;
-    RETURN_LONG(sum);
-} 
-PHP_FUNCTION(sample_long)
-{
-    ZVAL_LONG(return_value,400);
-}
-
-PHP_FUNCTION(sample_array_range)
-{
-    if (return_value_used) {
-        int i;
-        /* Return an array from 0 - 999 */
-        array_init(return_value);
-        for(i = 0; i < 1000; i++) {
-            add_next_index_long(return_value, i);
-        }
-        return;
-    } else {
-        /* Save yourself the effort */
-        php_error_docref(NULL TSRMLS_CC, E_NOTICE,
-               "Static return-only function called without processing output");
-        RETURN_NULL();
-    }
-}
 PHP_FUNCTION(is_associative)
 {
 
@@ -75,32 +60,7 @@ PHP_MINIT_FUNCTION(sample)
     ALLOC_HASHTABLE(FUNCTION_HOOKS);
     zend_hash_init(FUNCTION_HOOKS,256,0,0,1);
 }
-PHP_FUNCTION(copy_class)
-{
-    char *core_class,*user_class,*core_class_lower,*user_class_lower;
-    int len1,len2;
-    zend_class_entry **orig;
-    zend_class_entry **user;
-    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC,"ss",&core_class,&len1,&user_class,&len2)==FAILURE)
-        RETURN_NULL();
-    
-    //find core_class in the hash
-    core_class_lower = emalloc(len1 + 1);
-    user_class_lower = emalloc(len2 + 1);
-    
-    zend_str_tolower_copy(core_class_lower, core_class, len1);
-    zend_str_tolower_copy(user_class_lower, user_class, len2);
-    if (!zend_hash_find(EG(class_table), core_class_lower, len1+1, (void **)&orig)==SUCCESS)
-        php_error(1,"The class '%s' does not exist in PHP to copy.\n",core_class);
-    if (zend_hash_add(EG(class_table),user_class_lower,len2+1,orig,sizeof(*orig),0)==FAILURE)
-        php_error(1,"Unable to add '%s' as the class name for copied class.\n",user_class);
-    (*orig)->refcount++;
-    efree(core_class_lower);
-    efree(user_class_lower);
-
-    RETURN_TRUE;
-}
-PHP_FUNCTION(remove_class)
+PHP_FUNCTION(class_remove)
 {
     char *core_class,*core_class_lower;
     int len;
@@ -154,6 +114,62 @@ PHP_FUNCTION(class_rename)
 
     RETURN_TRUE;
 }
+//this is no use as the PHP compiler does not allow redifinition of functions, before running the code
+PHP_FUNCTION(function_rename)
+{
+    char *core_function,*user_function,*core_function_lower,*user_function_lower;
+    int len1,len2;
+    zend_function *orig;
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC,"ss",&core_function,&len1,&user_function,&len2)==FAILURE)
+        RETURN_NULL();
+    
+    //find core_function in the hash
+    core_function_lower = emalloc(len1 + 1);
+    zend_str_tolower_copy(core_function_lower, core_function, len1);
+    if (!zend_hash_find(EG(function_table), core_function_lower, len1+1, (void **)&orig)==SUCCESS)
+        php_error(1,"The function '%s' does not exist in PHP to rename.\n",core_function);
+
+
+
+    //find user_function in hash
+    user_function_lower = emalloc(len2 + 1);
+    zend_str_tolower_copy(user_function_lower,user_function, len2);
+    if (zend_hash_exists(EG(function_table), user_function_lower, len2+1))
+        php_error(1,"The function '%s' has been already defined and can't be renamed to.\n",user_function); 
+
+
+    //add user_function with key of core_function
+    // orig->refcount++;
+    function_add_ref(orig);
+    if (zend_hash_add(EG(function_table),user_function_lower,len2+1,orig,sizeof(*orig),0)==FAILURE
+        || zend_hash_del(EG(function_table),core_function_lower,len1+1)==FAILURE)
+        php_error(1,"Unable to rename function '%s' to '%s'.\n",core_function,user_function);
+
+    efree(core_function_lower);
+    efree(user_function_lower);
+
+    RETURN_TRUE;
+}
+PHP_FUNCTION(function_remove)
+{
+    char *core_function,*core_function_lower;
+    int len;
+    zend_function *orig;
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC,"s",&core_function,&len)==FAILURE)
+        RETURN_NULL();
+    
+    core_function_lower = emalloc(len + 1);
+    zend_str_tolower_copy(core_function_lower, core_function, len);
+    if (!zend_hash_find(EG(function_table), core_function_lower, len+1, (void **)&orig)==SUCCESS)
+        php_error(1,"The function '%s' does not exist in PHP to remove.\n",core_function);
+
+    if (zend_hash_del(EG(function_table),core_function_lower,len+1)==FAILURE)
+        php_error(1,"Unable to delete function '%s'.\n",core_function);
+
+    efree(core_function_lower);
+
+    RETURN_TRUE;
+}
 PHP_FUNCTION(hook_callback)
 {
     //get the called function name
@@ -161,7 +177,6 @@ PHP_FUNCTION(hook_callback)
     const char * function_name=ptr->function_state.function->common.function_name;
     // php_printf("fname: %s\n",function_name);
     char *hooked_func=function_name;
-    
 
     zval *user_function;
     if (zend_hash_find(FUNCTION_HOOKS,hooked_func,strlen(hooked_func)+1,&user_function)==FAILURE)
@@ -182,75 +197,89 @@ PHP_FUNCTION(hook_callback)
     // php_printf("arg count: %d\n",argc);
     int result=(call_user_function(EG(function_table),0,user_function,return_value,argc,*argv TSRMLS_CC)==SUCCESS);
     efree(argv);
-    RETURN_BOOL(result);
+    // RETURN_BOOL(result);
 }
-PHP_FUNCTION(unhook)
+PHP_FUNCTION(function_restore)
 {
-    char *core_function,*user_function;
-    long len;
+    char *core_function,*core_function_lower;
+    int len,res;
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC,"s",&core_function,&len)==FAILURE)
         RETURN_NULL();
-    zend_function *orig;
-    if (zend_hash_find(EG(function_table), core_function, len+1, (void **)&orig)==FAILURE) 
+    core_function_lower = emalloc(len + 1); 
+    zend_str_tolower_copy(core_function_lower, core_function, len);    
+    zend_function *orig,*new;
+    if (!zend_hash_find(EG(function_table), core_function_lower, len+1, (void **)&orig)==FAILURE) 
         php_error(1,"The function '%s' does not exist in PHP.\n",core_function);//function not found
 
-    // void (*handler)(INTERNAL_FUNCTION_PARAMETERS)=safe_emalloc(sizeof(void *),1,0);
-    void **handler=malloc(sizeof(void*));
-    if (zend_hash_find(FUNCTION_HOOKS,core_function,len+1,&handler)==FAILURE)
-        RETURN_FALSE; //not hooked
-    // php_printf("unhook:%p\n",*handler);
-    orig->internal_function.handler= *handler;
-    // zend_hash_del(FUNCTION_BACKUPS,core_function,len+1);
-    zend_hash_del(FUNCTION_HOOKS, core_function,len+1);
-    char name_original[100];
-    strcpy(name_original,core_function);
+
+    char *name_original=emalloc(len+1+strlen("_original"));
+    strcpy(name_original,core_function_lower);
     strcat(name_original,"_original");
 
-    zend_hash_del(EG(function_table), name_original,strlen(name_original)+1);
-    //FIXME: free the duplicate zend_function structure used for _original
+    // void (*handler)(INTERNAL_FUNCTION_PARAMETERS)=safe_emalloc(sizeof(void *),1,0);
+    if (zend_hash_find(EG(function_table),name_original,strlen(name_original)+1,&new)==FAILURE)
+        res=0;
+    else
+    {
+        orig->internal_function.handler= new->internal_function.handler;
 
-    RETURN_TRUE;
+        zend_hash_del(FUNCTION_HOOKS, core_function_lower,len+1);
+        zend_hash_del(EG(function_table), name_original,strlen(name_original)+1);
+        res=1;
+    }
+    efree(name_original);
+    efree(core_function_lower);
+    RETURN_BOOL(res);
 }
 //NOTICE: hooked functions involve an additional function call, to hook_callback.
 //the PHP debug backtrace will show both the original function being called and then the user-overriden version
-PHP_FUNCTION(hook)
+PHP_FUNCTION(function_override)
 {
-    char *core_function,*user_function;
-    long len1,len2;
+    char *core_function,*user_function,*core_function_lower,*user_function_lower;
+    int len1,len2;
+    int res;
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC,"ss",&core_function,&len1,&user_function,&len2)==FAILURE)
         RETURN_NULL();
     zend_function *orig;
-    if (zend_hash_find(EG(function_table), core_function, len1+1, (void **)&orig)==FAILURE) 
+    core_function_lower = emalloc(len1 + 1); 
+    zend_str_tolower_copy(core_function_lower, core_function, len1);    
+    if (zend_hash_find(EG(function_table), core_function_lower, len1+1, (void **)&orig)==FAILURE) 
         php_error(1,"The function '%s' does not exist in PHP to override.\n",core_function);
-        // RETURN_FALSE; //function not found
-    if (zend_hash_exists(FUNCTION_HOOKS,core_function,len1+1))
-        RETURN_FALSE; //already hooked this one.
-
-    char name_original[100];
-    strcpy(name_original,core_function);
-    strcat(name_original,"_original");
-    // php_printf("%s\n",name_original);
-
-
-    zend_function *orig_copy=emalloc(sizeof(zend_function));
-    *orig_copy=*orig;
-    function_add_ref(orig_copy); //creata a new oparray HashTable for the function, and inc refCount
-
-    orig->internal_function.handler = ZEND_FN(hook_callback);
-    if (zend_hash_add(EG(function_table),name_original,strlen(name_original)+1,orig_copy,sizeof(*orig_copy),0)==FAILURE)
-        php_printf("Unable to add the original function for %s.\n",core_function);
-
-    zval uf;
-    INIT_ZVAL(uf);
-    ZVAL_STRING(&uf,user_function,1);
-    zend_hash_update(FUNCTION_HOOKS,core_function,len1+1,&uf,sizeof(uf),0);
     
-    // void (*handler)(INTERNAL_FUNCTION_PARAMETERS);
-    // handler=orig->internal_function.handler;
-    // zend_hash_update(FUNCTION_BACKUPS,core_function,len1+1,&handler,sizeof(handler),0);
-    
-    // php_printf("hooked function name: %s\n",orig->internal_function.function_name);
-    RETURN_TRUE;
+    if (!zend_hash_exists(FUNCTION_HOOKS,core_function_lower,len1+1))
+        //not already hooked
+    {
+        user_function_lower = emalloc(len2+ 1); 
+        zend_str_tolower_copy(user_function_lower, user_function, len2);    
+        if (!zend_hash_exists(EG(function_table),user_function_lower,len2+1))
+            php_error(1,"The function '%s' you are attemping to use as the override is not defined yet.\n",user_function);
+
+        char *name_original=emalloc(len1+1+strlen("_original"));
+        strcpy(name_original,core_function_lower);
+        strcat(name_original,"_original");
+        // php_printf("%s\n",name_original);
+
+
+        zend_function *orig_copy=emalloc(sizeof(zend_function));
+        *orig_copy=*orig;
+        function_add_ref(orig_copy); //creata a new oparray HashTable for the function, and inc refCount
+
+        orig->internal_function.handler = ZEND_FN(hook_callback);
+        if (zend_hash_add(EG(function_table),name_original,strlen(name_original)+1,orig_copy,sizeof(*orig_copy),0)==FAILURE)
+            php_printf("Unable to add the original function for %s.\n",core_function);
+
+        zval uf;
+        INIT_ZVAL(uf);
+        ZVAL_STRING(&uf,user_function,1);
+        zend_hash_update(FUNCTION_HOOKS,core_function_lower,len1+1,&uf,sizeof(uf),0);
+        res=1;
+        efree(name_original);
+        efree(user_function_lower);
+    }
+    else
+        res=0;
+    efree(core_function_lower);
+    RETURN_BOOL(res);
 
 
 }
@@ -266,9 +295,12 @@ PHP_RSHUTDOWN_FUNCTION(sample)
 static zend_function_entry php_sample_functions[] = {
     PHP_FE(substring_distance,  NULL)
     PHP_FE(is_associative, NULL)
-    PHP_FE(hook,              NULL)
-    PHP_FE(unhook,              NULL)
+    PHP_FE(function_rename,              NULL)
+    PHP_FE(function_remove,              NULL)
+    PHP_FE(function_override,              NULL)
+    PHP_FE(function_restore,              NULL)
     PHP_FE(class_rename,              NULL)
+    PHP_FE(class_remove,              NULL)
 
     { NULL,NULL,NULL}
 };
