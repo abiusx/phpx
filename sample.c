@@ -55,11 +55,7 @@ PHP_FUNCTION(is_associative)
     RETURN_BOOL(1);
 
 }
-PHP_MINIT_FUNCTION(sample)
-{
-    ALLOC_HASHTABLE(FUNCTION_HOOKS);
-    zend_hash_init(FUNCTION_HOOKS,256,0,0,1);
-}
+
 PHP_FUNCTION(class_remove)
 {
     char *core_class,*core_class_lower;
@@ -283,24 +279,273 @@ PHP_FUNCTION(function_override)
 
 
 }
+PHP_FUNCTION(get_coverage_files)
+{
+    array_init(return_value);
+    HashTable * arrht=COVERAGE_FILES;
+    for(zend_hash_internal_pointer_reset(arrht);
+    zend_hash_has_more_elements(arrht) == SUCCESS;
+    zend_hash_move_forward(arrht)) {
+        char *key;
+        uint keylen;
+        ulong idx;
+        int type;
+        int val;
+        int *pval;
+        type = zend_hash_get_current_key_ex(arrht, &key, &keylen,
+                                                  &idx, 0, NULL);
+        zend_hash_get_current_data(arrht, &pval);
+        val=*pval;
+        // php_printf("YOYO:%d\n",**ppval);
+        if (type == HASH_KEY_IS_STRING)
+            add_assoc_long(return_value,key,val);
+        else
+            php_printf("SHOULDNT BE HERE\n");
+    }
+    // *return_value=Z_ARRVAL_P(COVERAGE_FILES);
+}
+/**
+ * 
+ */
+PHP_FUNCTION(get_coverage_lines)
+{
+    //TODO: this can be optimized to act like a generator instead of returning bulk
+    array_init(return_value);
+    HashTable * arrht=COVERAGE_LINES;
+    for(zend_hash_internal_pointer_reset(arrht);
+    zend_hash_has_more_elements(arrht) == SUCCESS;
+    zend_hash_move_forward(arrht)) {
+        char *key;
+        uint keylen;
+        ulong idx;
+        int type;
+        struct opcode_coverage *pval;
+        type = zend_hash_get_current_key_ex(arrht, &key, &keylen,
+                                                  &idx, 0, NULL);
+        zend_hash_get_current_data(arrht, &pval);
+
+        if (type == HASH_KEY_IS_STRING)
+        {
+            php_printf("SHOULDNT BE HERE\n");
+        }
+        else
+        {
+            zval *arr;
+            MAKE_STD_ZVAL(arr);
+            array_init(arr);
+            add_assoc_long(arr,"line",pval->line);
+            add_assoc_long(arr,"opcode",pval->opcode);
+            add_assoc_long(arr,"file",pval->file);
+            
+            add_next_index_zval(return_value,arr);
+        }
+    }
+    // RETURN_LONG(COVERAGE_LINES->nNumOfElements);
+}
+PHP_FUNCTION(coverage)
+{
+    bool b;
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC,"b",&b)==FAILURE)
+        RETURN_NULL(); 
+    XG(coverageEnabled)=b;
+}
+int opcode_handler(ZEND_OPCODE_HANDLER_ARGS)
+{
+
+    /**
+     * Performance breakdown of hooking PHP operations:
+     * Assuming we hook everything,
+     * 2x overhead on just calling the hook function
+     * Up to the first if, its still 2X. 
+     *
+     * The HashTable-ops afterwards cause about 8x overhead.
+     */
+    //zend_execute_data * execute_data is available here
+    if (!XG(coverageEnabled))
+        return ZEND_USER_OPCODE_DISPATCH;
+
+    XG(opcodeCount)++;
+
+    zend_op *cur_opcode;
+    int      lineno;
+    char    *file;
+    zend_op_array *op_array = execute_data->op_array;
+    cur_opcode = *EG(opline_ptr);
+    lineno = cur_opcode->lineno;
+    file = (char *)op_array->filename;
+
+    if (XG(prevFileString)==file && XG(prevLine)==lineno) 
+        return ZEND_USER_OPCODE_DISPATCH;
+
+
+    int fileIndex;
+    int *pFileIndex;
+    if (zend_hash_find(COVERAGE_FILES, file, strlen(file), &pFileIndex)==FAILURE) 
+    {
+        XG(fileCount)++;
+        fileIndex=XG(fileCount);
+        // php_printf("Storing '%s' as %d\n",file,fileIndex);
+        if (zend_hash_add(COVERAGE_FILES,file,strlen(file),&fileIndex,sizeof(XG(fileCount)),0)==FAILURE)
+            php_error(1,"Can not add file to coverage '%s'.\n",file);
+    }
+    else 
+    {
+        fileIndex=*pFileIndex;
+        // php_printf("Found %d\n",fileIndex);
+    } 
+    if (!(fileIndex==XG(prevFile) && lineno==XG(prevLine))) //remove consecutive duplicates
+    {
+        XG(prevFile)=fileIndex;
+        XG(prevLine)=lineno;
+        XG(prevFileString)=file;
+
+        struct opcode_coverage *pdata=emalloc(sizeof(struct opcode_coverage));
+        pdata->line=lineno;
+        pdata->file=fileIndex;
+        pdata->opcode=cur_opcode->opcode;
+        if (zend_hash_next_index_insert(COVERAGE_LINES, pdata,sizeof(*pdata),0)==FAILURE)
+            php_error(1,"Unable to record line coverage.\n");
+        efree(pdata);
+    }
+    // add_next_index_zval(COVERAGE_LINES,arr);
+    return ZEND_USER_OPCODE_DISPATCH;
+
+}
+PHP_MSHUTDOWN_FUNCTION(sample)
+{
+    zend_hash_destroy(COVERAGE_LINES);
+}
+PHP_MINIT_FUNCTION(sample)
+{
+    ALLOC_HASHTABLE(FUNCTION_HOOKS);
+    zend_hash_init(FUNCTION_HOOKS,256,0,0,1);
+    
+}
+#define exc(f) hook_exclusions[ZEND_##f]=1;
 PHP_RINIT_FUNCTION(sample)
 {
+    XG(coverageEnabled)=0;
+    XG(opcodeCount)=0;
+    XG(fileCount)=0;
+    XG(prevFile)=XG(prevLine)=0;
+    
+    ALLOC_HASHTABLE(COVERAGE_FILES);
+    zend_hash_init(COVERAGE_FILES,64,0,0,0);
+    ALLOC_HASHTABLE(COVERAGE_LINES);
+    zend_hash_init(COVERAGE_LINES,1024,0,0,0);
+
+    int i=0;
+    int hook_exclusions[154];
+    int *he=hook_exclusions;    
+    for (i=0;i<=153;++i)
+        he[i]=0;
+
+    exc(NOP);
+    exc(ADD);
+    exc(SUB);
+    exc(MUL);
+    exc(DIV);
+    exc(MOD);
+    exc(SL);
+    exc(SR);
+    exc(BW_OR);
+    exc(BW_AND);
+    exc(BW_XOR);
+    exc(BW_NOT);
+    exc(BOOL_NOT);
+    exc(BOOL_XOR);
+    exc(BOOL_XOR);
+    exc(ASSIGN_ADD);
+    exc(ASSIGN_SUB);
+    exc(ASSIGN_MUL);
+    exc(ASSIGN_DIV);
+    exc(ASSIGN_MOD);
+    exc(ASSIGN_SL);
+    exc(ASSIGN_SR);
+    exc(ASSIGN_BW_OR);
+    exc(ASSIGN_BW_AND);
+    exc(ASSIGN_BW_XOR);
+    exc(PRE_INC);
+    exc(PRE_DEC);
+    exc(POST_INC);
+    exc(POST_DEC);
+    exc(ASSIGN_REF); //e.g global $a;
+
+    exc(JMP);
+    exc(JMPZ);
+    exc(JMPNZ);
+    exc(JMPZNZ);
+    exc(JMPZ_EX);
+    exc(JMPNZ_EX);
+    
+    exc(SWITCH_FREE); //e.g closing brace
+    exc(BRK);
+    exc(CONT);
+    
+    exc(BOOL);
+    exc(FREE);
+    exc(UNSET_VAR);
+    exc(UNSET_DIM);
+    exc(UNSET_OBJ);
+    exc(EXIT);
+    exc(GOTO);
+    exc(TICKS);
+
+    exc(CATCH);
+    exc(THROW);
+    exc(CLONE);
+
+    exc(PRE_INC_OBJ);
+    exc(PRE_DEC_OBJ);
+    exc(POST_DEC_OBJ);
+    exc(POST_INC_OBJ);
+
+
+    ///we want all operations except those we are sure cant have strings.
+
+
+    // he[ZEND_CONCAT]=0;
+    // he[ZEND_ASSIGN_CONCAT]=0;
+    // he[ZEND_ASSIGN]=0;
+    
+    // he[ZEND_DO_FCALL]=0;
+    
+    // he[ZEND_ADD_VAR]=0;
+    // he[ZEND_ADD_STRING]=0;
+    // he[ZEND_INIT_STRING]=0;
+    
+    // he[ZEND_ECHO]=0;
+    // he[ZEND_PRINT]=0;
+
+    for (i=0;i<=153;++i) //start from 1, exclude NOP
+    {
+
+        if (he[i]) continue;
+        zend_set_user_opcode_handler(i,opcode_handler);
+    }
     return SUCCESS;
 }
 PHP_RSHUTDOWN_FUNCTION(sample)
 {
+    // php_printf("\n OP count:%d\n",XG(opcodeCount));
     return SUCCESS;
 }
 //functions added to userspace
 static zend_function_entry php_sample_functions[] = {
     PHP_FE(substring_distance,  NULL)
     PHP_FE(is_associative, NULL)
+    
     PHP_FE(function_rename,              NULL)
     PHP_FE(function_remove,              NULL)
     PHP_FE(function_override,              NULL)
     PHP_FE(function_restore,              NULL)
+    
     PHP_FE(class_rename,              NULL)
     PHP_FE(class_remove,              NULL)
+    
+    PHP_FE(get_coverage_lines,              NULL)
+    PHP_FE(get_coverage_files,              NULL)
+    PHP_FE(coverage,              NULL)
 
     { NULL,NULL,NULL}
 };
@@ -315,7 +560,7 @@ zend_module_entry sample_module_entry = {
     PHP_SAMPLE_EXTNAME,
     php_sample_functions, /* Functions */
     PHP_MINIT(sample), /* MINIT */
-    NULL, /* MSHUTDOWN */
+    PHP_MSHUTDOWN(sample), /* MSHUTDOWN */
     PHP_RINIT(sample), /* RINIT */
     PHP_RSHUTDOWN(sample), /* RSHUTDOWN */
     NULL, /* MINFO */
