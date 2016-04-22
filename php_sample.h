@@ -4,7 +4,9 @@
 
 /* Define Extension Properties */
 #define PHP_SAMPLE_EXTNAME    "sample"
-#define PHP_SAMPLE_EXTVER    "1.0"
+#define PHP_SAMPLE_EXTVER    "1.1"
+#define PHPX_EXTVER    "1.2"
+#define PHPX_EXTNAME    "PHPx"
 
 /* Import configure options
    when building outside of
@@ -15,6 +17,8 @@
 
 /* Include PHP Standard Header */
 #include "php.h"
+#include "zend_extensions.h"
+#include "zend_types.h"
 
 /* Define the entry point symbol
  * Zend will use when loading this module
@@ -26,7 +30,7 @@ extern zend_module_entry sample_module_entry;
 #define XG(x) (sample_globals.x)
 struct opcode_coverage { 
 	uint line;
-	zend_ushort file;
+	zend_ulong file;
 	zend_uchar opcode;
 	//8 byte, gives good memory utilization on 64bit
 };

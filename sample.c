@@ -1,5 +1,4 @@
 #include "php_sample.h"
-#include "zend_extensions.h"
 
 //TODO: code coverage from xdebug
 //TODO: move minit stuff to rinit, or hooks remain!, or just make hook hashes per request
@@ -21,7 +20,7 @@
  *
  * Take a look at sample.php for more examples.
  */
-
+/*
 PHP_FUNCTION(substring_distance)
 {
     char *str1,*str2;
@@ -304,9 +303,6 @@ PHP_FUNCTION(get_coverage_files)
     }
     // *return_value=Z_ARRVAL_P(COVERAGE_FILES);
 }
-/**
- * 
- */
 PHP_FUNCTION(get_coverage_lines)
 {
     //TODO: this can be optimized to act like a generator instead of returning bulk
@@ -349,6 +345,7 @@ PHP_FUNCTION(coverage)
         RETURN_NULL(); 
     XG(coverageEnabled)=b;
 }
+*/
 int opcode_handler(ZEND_OPCODE_HANDLER_ARGS)
 {
 
@@ -363,7 +360,7 @@ int opcode_handler(ZEND_OPCODE_HANDLER_ARGS)
     //zend_execute_data * execute_data is available here
     if (!XG(coverageEnabled))
         return ZEND_USER_OPCODE_DISPATCH;
-
+/*
     XG(opcodeCount)++;
 
     zend_op *cur_opcode;
@@ -408,23 +405,33 @@ int opcode_handler(ZEND_OPCODE_HANDLER_ARGS)
         efree(pdata);
     }
     // add_next_index_zval(COVERAGE_LINES,arr);
+*/
     return ZEND_USER_OPCODE_DISPATCH;
 
 }
-PHP_MSHUTDOWN_FUNCTION(sample)
+PHP_FUNCTION(is_ref)
 {
-    zend_hash_destroy(COVERAGE_LINES);
+    zval *z;
+    int res;
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC,"z/",&z)==FAILURE)
+        return;
+    RETURN_BOOL(Z_ISREF_P(z));
 }
-PHP_MINIT_FUNCTION(sample)
+PHP_MSHUTDOWN_FUNCTION(phpx)
 {
-    ALLOC_HASHTABLE(FUNCTION_HOOKS);
-    zend_hash_init(FUNCTION_HOOKS,256,0,0,1);
+    // zend_hash_destroy(COVERAGE_LINES);
+}
+PHP_MINIT_FUNCTION(phpx)
+{
+    // ALLOC_HASHTABLE(FUNCTION_HOOKS);
+    // zend_hash_init(FUNCTION_HOOKS,256,0,0,1);
     
 }
 #define exc(f) hook_exclusions[ZEND_##f]=1;
-PHP_RINIT_FUNCTION(sample)
+PHP_RINIT_FUNCTION(phpx)
 {
-    XG(coverageEnabled)=0;
+/*
+    XG(coverageEnabled)=1;
     XG(opcodeCount)=0;
     XG(fileCount)=0;
     XG(prevFile)=XG(prevLine)=0;
@@ -433,7 +440,6 @@ PHP_RINIT_FUNCTION(sample)
     zend_hash_init(COVERAGE_FILES,64,0,0,0);
     ALLOC_HASHTABLE(COVERAGE_LINES);
     zend_hash_init(COVERAGE_LINES,1024,0,0,0);
-
     int i=0;
     int hook_exclusions[154];
     int *he=hook_exclusions;    
@@ -478,7 +484,7 @@ PHP_RINIT_FUNCTION(sample)
     exc(JMPZ_EX);
     exc(JMPNZ_EX);
     
-    exc(SWITCH_FREE); //e.g closing brace
+    // exc(SWITCH_FREE); //e.g closing brace
     exc(BRK);
     exc(CONT);
     
@@ -519,37 +525,37 @@ PHP_RINIT_FUNCTION(sample)
 
     for (i=0;i<=153;++i) //start from 1, exclude NOP
     {
-
         if (he[i]) continue;
         zend_set_user_opcode_handler(i,opcode_handler);
     }
+*/
     return SUCCESS;
 }
-PHP_RSHUTDOWN_FUNCTION(sample)
+PHP_RSHUTDOWN_FUNCTION(phpx)
 {
     // php_printf("\n OP count:%d\n",XG(opcodeCount));
     return SUCCESS;
 }
 //functions added to userspace
-static zend_function_entry php_sample_functions[] = {
-    PHP_FE(substring_distance,  NULL)
-    PHP_FE(is_associative, NULL)
+static zend_function_entry phpx_functions[] = {
+    // PHP_FE(substring_distance,  NULL)
+    // PHP_FE(is_associative, NULL)
     
-    PHP_FE(function_rename,              NULL)
-    PHP_FE(function_remove,              NULL)
-    PHP_FE(function_override,              NULL)
-    PHP_FE(function_restore,              NULL)
+    // PHP_FE(function_rename,              NULL)
+    // PHP_FE(function_remove,              NULL)
+    // PHP_FE(function_override,              NULL)
+    // PHP_FE(function_restore,              NULL)
     
-    PHP_FE(class_rename,              NULL)
-    PHP_FE(class_remove,              NULL)
+    // PHP_FE(class_rename,              NULL)
+    // PHP_FE(class_remove,              NULL)
     
-    PHP_FE(get_coverage_lines,              NULL)
-    PHP_FE(get_coverage_files,              NULL)
-    PHP_FE(coverage,              NULL)
+    // PHP_FE(get_coverage_lines,              NULL)
+    // PHP_FE(get_coverage_files,              NULL)
+    // PHP_FE(coverage,              NULL)
+    PHP_FE(is_ref,              NULL)
 
     { NULL,NULL,NULL}
 };
-
 
 
 //module entry points
@@ -557,25 +563,28 @@ zend_module_entry sample_module_entry = {
 #if ZEND_MODULE_API_NO >= 20010901
      STANDARD_MODULE_HEADER,
 #endif
-    PHP_SAMPLE_EXTNAME,
-    php_sample_functions, /* Functions */
-    PHP_MINIT(sample), /* MINIT */
-    PHP_MSHUTDOWN(sample), /* MSHUTDOWN */
-    PHP_RINIT(sample), /* RINIT */
-    PHP_RSHUTDOWN(sample), /* RSHUTDOWN */
-    NULL, /* MINFO */
+    PHPX_EXTNAME, //name
+    phpx_functions, // Functions 
+    PHP_MINIT(phpx), // MINIT 
+    PHP_MSHUTDOWN(phpx), // MSHUTDOWN 
+    PHP_RINIT(phpx), // RINIT 
+    PHP_RSHUTDOWN(phpx), // RSHUTDOWN 
+    NULL, // MINFO 
 #if ZEND_MODULE_API_NO >= 20010901
-    PHP_SAMPLE_EXTVER,
+    PHPX_EXTVER,
 #endif
        // NO_MODULE_GLOBALS,
     // ZEND_MODULE_POST_ZEND_DEACTIVATE_N(sample),
 
     STANDARD_MODULE_PROPERTIES_EX
 };
-
-#ifdef COMPILE_DL_SAMPLE
+#ifdef COMPILE_DL_MYLIB
 ZEND_GET_MODULE(sample)
 #endif
+// #ifdef COMPILE_DL_SAMPLE
+// ZEND_GET_MODULE(sample)
+// #endif
+/*
 
 ZEND_DLEXPORT void sample_statement_call(zend_op_array *op_array)
 {
@@ -617,15 +626,16 @@ ZEND_DLEXPORT zend_extension zend_extension_entry = {
     XDEBUG_COPYRIGHT_SHORT,
     sample_zend_startup,
     sample_zend_shutdown,
-    NULL,           /* activate_func_t */
-    NULL,           /* deactivate_func_t */
-    NULL,           /* message_handler_func_t */
-    NULL,           /* op_array_handler_func_t */
-    sample_statement_call, /* statement_handler_func_t */
-    NULL,           /* fcall_begin_handler_func_t */
-    NULL,           /* fcall_end_handler_func_t */
-    sample_init_oparray,   /* op_array_ctor_func_t */
-    NULL,           /* op_array_dtor_func_t */
+    NULL,           // activate_func_t 
+    NULL,           // deactivate_func_t 
+    NULL,           // message_handler_func_t 
+    NULL,           // op_array_handler_func_t 
+    sample_statement_call, // statement_handler_func_t 
+    NULL,           // fcall_begin_handler_func_t 
+    NULL,           // fcall_end_handler_func_t 
+    sample_init_oparray,   // op_array_ctor_func_t 
+    NULL,           // op_array_dtor_func_t 
     STANDARD_ZEND_EXTENSION_PROPERTIES
 };
 
+/**/

@@ -1,8 +1,9 @@
-PHP_ARG_ENABLE(sample,
-  [Whether to enable the "sample" extension],
-  [  enable-sample        Enable "sample" extension support])
+PHP_ARG_ENABLE(phpx,
+  [Whether to enable the "phpx" extension],
+  [  enable-phpx        Enable "phpx" extension support])
 
-if test $PHP_SAMPLE != "no"; then
-  PHP_SUBST(SAMPLE_SHARED_LIBADD)
-  PHP_NEW_EXTENSION(sample, sample.c, $ext_shared)
+if test $PHP_PHPX != "no"; then
+  AC_DEFINE(HAVE_PHPX, 1, [Whether you have PHPX])
+  PHP_SUBST(PHPX_SHARED_LIBADD)
+  PHP_NEW_EXTENSION(phpx, phpx.c, $ext_shared)
 fi
