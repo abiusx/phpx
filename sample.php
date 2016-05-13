@@ -1,4 +1,37 @@
 <?php
+
+$a=[2,&$a];
+$a2=deep_copy($a);
+$a[0]++;
+var_dump($a);
+var_dump($a2);
+die();
+
+// $b=5;
+// $a=[&$b,&$b,$b,2,2,2,2];
+// $a2=deep_copy($a);
+// $b++;
+// var_dump($a2); //should not change
+// die();
+$b=10;
+$c="hello";
+$a=[0,&$b,&$c,&$b,&$b,$b];
+// echo xserialize($a);
+$a2=deep_copy($a);
+$a[1]++;
+$a[2].=" there";
+$a2[1]--;
+var_dump($a);
+var_dump($a2);
+/*
+die();
+$f=fopen("/tmp/a","wt");
+$f2=fopen("/tmp/b","wt");
+$f3=fopen("/tmp/b","wt");
+$x=[5,4,1,"hello",$f,&$f2,"nono",$f3];
+var_dump(xserialize($x));
+
+die();
 $x=2;
 $a=2;
 $array=[$a,&$a];
@@ -110,3 +143,7 @@ foreach ($x->query("SELECT 1,2,3,4,0") as $data)
 $x->Something();
 
 
+
+
+
+/**/
