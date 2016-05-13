@@ -58,7 +58,7 @@ PHP_RSHUTDOWN_FUNCTION(phpx)
 static zend_function_entry phpx_functions[] = {
     PHP_FE(is_ref,              phpx_byref_arginfo)
     PHP_FE(zval_id,              phpx_byref_arginfo)
-    PHP_FE(xserialize,              phpx_byref_arginfo)
+    // PHP_FE(xserialize,              phpx_byref_arginfo)
     PHP_FE(deep_copy,              phpx_byref_arginfo)
 
     { NULL,NULL,NULL}

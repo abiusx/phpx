@@ -1,11 +1,18 @@
 <?php
 
-$a=[2,&$a];
-$a2=deep_copy($a);
-$a[0]++;
-var_dump($a);
+$o=new stdClass;
+$b=5;
+$fp=fopen("/tmp/tmp","wt");
+$a2=deep_copy($fp);
 var_dump($a2);
 die();
+
+// $a=[2,&$a];
+// $a2=deep_copy($a);
+// $a[0]++;
+// var_dump($a);
+// var_dump($a2);
+// die();
 
 // $b=5;
 // $a=[&$b,&$b,$b,2,2,2,2];
