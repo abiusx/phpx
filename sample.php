@@ -1,9 +1,25 @@
 <?php
+$a=range(0,1000);
+for ($i=0;$i<1000;++$i)
+	// $a2=$a;
+	$a2=deep_copy($a);
+var_dump(memory_get_peak_usage());
+var_dump(memory_get_usage());
 
+die();
 $o=new stdClass;
+$o->a=1;
+$o->b=2;
+
 $b=5;
 $fp=fopen("/tmp/tmp","wt");
-$a2=deep_copy($fp);
+$o2=$o;
+$a=[$o,$o,&$o,$o,$o2,&$o];
+// $a=[$o,$o,&$o,$o,$o2];
+$a2=deep_copy($a);
+$o->a++;
+$a2[0]->a--;
+var_dump($a);
 var_dump($a2);
 die();
 
