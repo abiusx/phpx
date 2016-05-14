@@ -1,51 +1,72 @@
 <?php
-$a=range(0,1000);
+// test_deep_copy_recursive_reference() or die;
+// test_deepcopy_object_reference() or die;
+// test_deep_copy_variable_reference() or die;
+test_deep_copy_variable_reference2() or die;
+ob_start();
 for ($i=0;$i<1000;++$i)
+	test_deepcopy_mem_leak();
+ob_get_clean();
+gc_collect_cycles();
+var_dump(memory_get_usage()/1024.0/1024.0);
+die();
+function test_deepcopy_mem_leak()
+{
+	$a=range(0,1000);
 	// $a2=$a;
 	$a2=deep_copy($a);
-var_dump(memory_get_peak_usage());
-var_dump(memory_get_usage());
+	var_dump(memory_get_peak_usage());
+	var_dump(memory_get_usage());
+}
 
-die();
-$o=new stdClass;
-$o->a=1;
-$o->b=2;
+function test_deepcopy_object_reference()
+{
+	$o=new stdClass;
+	$o->a=1;
+	$o->b=2;
 
-$b=5;
-$fp=fopen("/tmp/tmp","wt");
-$o2=$o;
-$a=[$o,$o,&$o,$o,$o2,&$o];
-// $a=[$o,$o,&$o,$o,$o2];
-$a2=deep_copy($a);
-$o->a++;
-$a2[0]->a--;
-var_dump($a);
-var_dump($a2);
-die();
+	$b=5;
+	// $fp=fopen("/tmp/tmp","wt");
+	$o2=$o;
+	$a=['a'=>$o,$o,&$o,$o,$o2,&$o];
+	// $a=[$o,$o,&$o,$o,$o2];
+	$a2=deep_copy($a);
+	$o->a++;
+	$a2[0]->a--;
+	var_dump($a);
+	var_dump($a2);
+}
+function test_deep_copy_recursive_reference()
+{
+	$a=[2,&$a];
+	$a2=deep_copy($a);
+	$a[0]++;
+	var_dump($a);
+	var_dump($a2);
 
-// $a=[2,&$a];
-// $a2=deep_copy($a);
-// $a[0]++;
-// var_dump($a);
-// var_dump($a2);
-// die();
+}
+function test_deep_copy_variable_reference()
+{
 
-// $b=5;
-// $a=[&$b,&$b,$b,2,2,2,2];
-// $a2=deep_copy($a);
-// $b++;
-// var_dump($a2); //should not change
-// die();
-$b=10;
-$c="hello";
-$a=[0,&$b,&$c,&$b,&$b,$b];
-// echo xserialize($a);
-$a2=deep_copy($a);
-$a[1]++;
-$a[2].=" there";
-$a2[1]--;
-var_dump($a);
-var_dump($a2);
+	$b=5;
+	$a=[&$b,&$b,$b,2,2,2,2];
+	$a2=deep_copy($a);
+	$b++;
+	var_dump($a2); //should not change
+}
+function test_deep_copy_variable_reference2()
+{
+	$b=10;
+	$c="hello";
+	$a=[0,&$b,&$c,&$b,&$b,$b];
+	// echo xserialize($a);
+	$a2=deep_copy($a);
+	$a[1]++;
+	$a[2].=" there";
+	$a2[1]--;
+	var_dump($a);
+	var_dump($a2);
+}
 /*
 die();
 $f=fopen("/tmp/a","wt");
