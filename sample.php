@@ -8,7 +8,7 @@ for ($i=0;$i<1000;++$i)
 	test_deepcopy_mem_leak();
 ob_get_clean();
 gc_collect_cycles();
-var_dump(memory_get_usage()/1024.0/1024.0);
+printf("%.3fKB\n",memory_get_usage()/1024.0);
 die();
 function test_deepcopy_mem_leak()
 {
@@ -58,7 +58,7 @@ function test_deep_copy_variable_reference2()
 {
 	$b=10;
 	$c="hello";
-	$a=[0,&$b,&$c,&$b,&$b,$b];
+	$a=[0,&$b,&$c];//,&$b,&$b,$b];
 	// echo xserialize($a);
 	$a2=deep_copy($a);
 	$a[1]++;
