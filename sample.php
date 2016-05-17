@@ -1,7 +1,7 @@
 <?php
 // test_deep_copy_recursive_reference() or die;
-test_deepcopy_object_reference() or die;
-// test_deep_copy_variable_reference() or die;
+// test_deepcopy_object_reference() or die;
+test_deep_copy_variable_reference() or die;
 test_deep_copy_variable_reference2() or die;
 ob_start();
 for ($i=0;$i<1000;++$i)
@@ -52,6 +52,7 @@ function test_deep_copy_variable_reference()
 	$a=[&$b,&$b,$b,2,2,2,2];
 	$a2=deep_copy($a);
 	$b++;
+	var_dump($a);
 	var_dump($a2); //should not change
 }
 function test_deep_copy_variable_reference2()
