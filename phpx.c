@@ -164,8 +164,10 @@ zval * deep_copy_intern(zval *var,zend_array *pool,zend_array *object_pool,int d
                 cloned_obj=emalloc(sizeof(zval));
                 ZVAL_OBJ(cloned_obj,zend_objects_clone_obj(obj));
             }
+            Z_ADDREF_P(cloned_obj);
             zend_hash_index_add_new(object_pool,handle,cloned_obj);
         }
+        Z_ADDREF_P(cloned_obj);
         zend_hash_index_add_new(pool,id,cloned_obj);
         return cloned_obj;
     }
@@ -181,7 +183,7 @@ zval * deep_copy_intern(zval *var,zend_array *pool,zend_array *object_pool,int d
         temp=deep_copy_intern(Z_REFVAL_P(var),pool,object_pool,depth+1);
         zval *copy=emalloc(sizeof(zval));
         ZVAL_NEW_REF(copy,temp); //make it a reference again
-
+        Z_ADDREF_P(copy);
         #ifdef PHPX_DEBUG
         for (int i=0;i<depth;++i) printf("\t");
         printf("\tWrapping back into reference...\n");
@@ -255,22 +257,27 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
     {
         zval *cloned_obj;
         zend_ulong handle=Z_OBJ_HANDLE_P(var);
-        if ((cloned_obj=zend_hash_index_find(object_pool,handle)))
+        // if ((cloned_obj=zend_hash_index_find(object_pool,handle)))
+        // {
+        //     // *out=*cloned_obj;
+        //     say("sofar4\n");
+        //     ZVAL_COPY(out,cloned_obj);
+        //     return 0;
+        // }
+        // else //new object
         {
-            *out=*cloned_obj;
-            return 0;
-        }
-        else //new object
-        {
-            if (!isCloneable(var))
-            {
-                php_error_docref("phpx",E_NOTICE,"Attempting to deep copy an uncloneable object.");
-                ZVAL_COPY_VALUE(out,var); //copy zval
-            }
-            else 
+            // if (!isCloneable(var))
+            // {
+            //     php_error_docref("phpx",E_NOTICE,"Attempting to deep copy an uncloneable object.");
+            //     ZVAL_COPY_VALUE(out,var); //copy zval
+            // }
+            // else 
                 ZVAL_OBJ(out,zend_objects_clone_obj((zval *)var)); //clone
-            zend_hash_index_add_new(object_pool,handle,out);
+            say("sofar1\n");
+            // zend_hash_index_add_new(object_pool,handle,out);
+            say("sofar2\n");
         }
+        say("sofar3\n");
         zend_hash_index_add_new(pool,id,out);
         return 1;
     }
@@ -295,7 +302,7 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
 
 }
 
-// #define DEEPCOPY_OLD 1
+#define DEEPCOPY_OLD 1
 PHP_FUNCTION(deep_copy)
 {
     zval *var;
