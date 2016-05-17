@@ -1,6 +1,6 @@
 <?php
 // test_deep_copy_recursive_reference() or die;
-// test_deepcopy_object_reference() or die;
+test_deepcopy_object_reference() or die;
 test_deep_copy_variable_reference() or die;
 test_deep_copy_variable_reference2() or die;
 ob_start();

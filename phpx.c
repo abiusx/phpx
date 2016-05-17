@@ -314,6 +314,7 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
     {
         int res=deep_copy_intern_ex(Z_REFVAL_P(var),out,pool,object_pool,depth+1);
         ZVAL_NEW_REF(out,out); //make it a reference again
+        Z_ADDREF_P(out); //this is the fix
         
         zend_hash_index_add_new(pool,id,out); //cache reference
         Z_ADDREF_P(out); //this is the fix
@@ -325,7 +326,7 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
             php_error_docref("phpx",E_NOTICE,"Attempting to deep copy a resource.");
         
         ZVAL_COPY(out, var);
-        // Z_ADDREF_P(out);
+        // Z_ADDREF_P(out); //not here. is done by pool check
         zend_hash_index_add_new(pool,id,out); //cache this zval
         return 1;
     } 
