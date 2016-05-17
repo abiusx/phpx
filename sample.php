@@ -1,22 +1,20 @@
 <?php
+test_deepcopy_mem_leak() or die;
 // test_deep_copy_recursive_reference() or die;
-test_deepcopy_object_reference() or die;
-test_deep_copy_variable_reference() or die;
-test_deep_copy_variable_reference2() or die;
-ob_start();
-for ($i=0;$i<1000;++$i)
-	test_deepcopy_mem_leak();
-ob_get_clean();
-gc_collect_cycles();
-printf("%.3fKB\n",memory_get_usage()/1024.0);
+// test_deepcopy_object_reference() or die;
+// test_deep_copy_variable_reference() or die;
+// test_deep_copy_variable_reference2() or die;
 die();
 function test_deepcopy_mem_leak()
 {
+	printf("%.3fKB\n",memory_get_usage()/1024.0);
+	printf("%.3fKB\n",memory_get_usage()/1024.0);
 	$a=range(0,1000);
-	// $a2=$a;
-	$a2=deep_copy($a);
-	var_dump(memory_get_peak_usage());
-	var_dump(memory_get_usage());
+	for ($i=0;$i<1000;++$i)
+		$a2=deep_copy($a);
+	gc_collect_cycles();
+	unset($a,$a2,$i);
+	printf("%.3fKB\n",memory_get_usage()/1024.0);
 }
 
 function test_deepcopy_object_reference()

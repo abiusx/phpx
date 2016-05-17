@@ -1,6 +1,9 @@
 #include "phpx.h"
 //ZEND_BEGIN_ARG_INFO(phpx_byref, pass_rest_by_reference)
+// #define PHPX_DEBUG 
+#ifdef PHPX_DEBUG
 #define say(...) do { printf(__VA_ARGS__); fflush(stdout); } while (0)
+#endif
 ZEND_BEGIN_ARG_INFO_EX(phpx_byref_arginfo, 
     1 /*pass_rest_by_reference*/, 
     0/*return_reference*/,
@@ -43,8 +46,6 @@ static int isCloneable(const zval *obj)
     }
 }
 
-#define PHPX_DEBUG 
-// #undef PHPX_DEBUG
 zval * deep_copy_intern(zval *var,zend_array *pool,zend_array *object_pool,int depth)
 {
     //TODO: don't really need object_pool, apparently all same objects are same zval (and have the same id)
