@@ -214,42 +214,16 @@ zval * deep_copy_intern(zval *var,zend_array *pool,zend_array *object_pool,int d
 
 int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *object_pool,int depth)
 {
-    #ifdef PHPX_DEBUG
-    for (int i=0;i<depth;++i) printf("\t");
-    printf("Output type: %d, Depth %d, Size %d, Type %d\n",Z_TYPE_P(out),depth,zend_hash_num_elements(pool),zval_get_type(var));
-    fflush(stdout);
-    #endif
-
-
-
-
-
     zend_ulong id=zval_id(var);
-    
-    #ifdef PHPX_DEBUG
-    for (int i=0;i<depth;++i) printf("\t");
-    printf("\tGoing to check pool for id %llu... ",id);
-    fflush(stdout);
-    #endif
-
-
     zval *copy;
     if ((copy=zend_hash_index_find(pool,id)))
     { 
         if (Z_ISREF_P(copy))
             Z_ADDREF_P(copy);
-        // *out=*copy; //TODO:this is not the way to go (apparently this is not the issue)
+        // *out=*copy; //TODO:this or the one below? zval copy does not duplicate, it copies (as in memcpy)
         ZVAL_COPY(out,copy);
-        #ifdef PHPX_DEBUG
-        printf("Already available with id (%llu) and type (%d), returning.\n",id,zval_get_type(copy));   
-        fflush(stdout);
-        #endif
         return 0; //no element actually copied
     }
-    #ifdef PHPX_DEBUG
-    printf("not in the pool.\n");
-    fflush(stdout);
-    #endif
     if (Z_TYPE_P(var)==IS_ARRAY)
     {
         array_init(out); 
@@ -268,8 +242,6 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
                 zval tmp;
                 ZVAL_NULL(&tmp);
                 res+=deep_copy_intern_ex(data,&tmp,pool,object_pool,depth+1);
-                printf("Array element copy result type:%d id:%llu\n",Z_TYPE(tmp),zval_id(&tmp));
-                fflush(stdout);
                 if (!key)
                     add_index_zval(out,index,&tmp); //copied into array
                 else
@@ -304,21 +276,9 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
     }
     else if (Z_TYPE_P(var)==IS_REFERENCE)
     {
-        printf("REFIN TYPE: %d zvalid:%llu\n",Z_TYPE_P((out)),zval_id(out));
-        fflush(stdout);
-        zval tmp;
-        int res=deep_copy_intern_ex(Z_REFVAL_P(var),&tmp,pool,object_pool,depth+1);
-        // ZVAL_NEW_REF(out,&tmp); //make it a reference again
-        printf("REFOUT TYPE: %d zvalid:%llu\n",Z_TYPE_P((&tmp)),zval_id(&tmp));
-        ZVAL_NEW_REF(out,&tmp); //make it a reference again
-        //^ this is the culprit
-        //PROGRESS: no matter what I do, when this wrapping is done, this reference
-        //  becomes the same zval as the reference from previous copy
-        //  and I have no idea why. even changing out does not help,
-        //  even though that's the only shared thing between them. investigate.
-        zval_dtor(&tmp);
-        printf("REFOUT(wrapped) TYPE: %d zvalid:%llu\n",Z_TYPE_P(Z_REFVAL_P(out)),zval_id(out));
-        fflush(stdout);
+        int res=deep_copy_intern_ex(Z_REFVAL_P(var),out,pool,object_pool,depth+1);
+        ZVAL_NEW_REF(out,out); //make it a reference again
+        Z_ADDREF_P(out); //this is the fix
         zend_hash_index_add_new(pool,id,out); //cache reference
         return res;
     }
@@ -327,13 +287,10 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
         if (Z_TYPE_P(var)==IS_RESOURCE)
             php_error_docref("phpx",E_NOTICE,"Attempting to deep copy a resource.");
         
-        printf("ORIG TYPE: %d\n",Z_TYPE_P((var)));
         ZVAL_COPY(out, var);
-        printf("COPY TYPE: %d\n",Z_TYPE_P((out)));
         zend_hash_index_add_new(pool,id,out); //cache this zval
         return 1;
     } 
-    printf("SHOULDN'T BE HERE!\n");
     return 0;
 
 }

@@ -58,7 +58,7 @@ function test_deep_copy_variable_reference2()
 {
 	$b=10;
 	$c="hello";
-	$a=[0,&$b,&$c];//,&$b,&$b,$b];
+	$a=[0,&$b,&$c,&$b,&$b,$b];
 	// echo xserialize($a);
 	$a2=deep_copy($a);
 	$a[1]++;
