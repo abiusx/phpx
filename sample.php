@@ -1,5 +1,8 @@
 <?php
 
+test_array2() or die;
+test_everything() or die;
+test_deepcopy_mem_leak() or die;
 test_deepcopy_mem_leak2() or die;
 
 // test_deep_copy_recursive_reference() or die;
@@ -7,12 +10,56 @@ test_deepcopy_mem_leak2() or die;
 // test_deep_copy_variable_reference() or die;
 // test_deep_copy_variable_reference2() or die;
 die();
+function test_array2()
+{
+	$a=[0,1,2,3];
+	$a[]=$a;
+	$a[]=&$a;
+
+	$a2=deep_copy($a);
+	$a[1]++;
+	var_dump($a);
+	unset($a);
+	var_dump($a2);
+}
+function test_array_copy()
+{
+	$a0=[1,2,3,4];
+	$a1=[$a0,5,6,$a0];
+
+	$a2=deep_copy($a1);
+	$a1[1]++;
+	var_dump($a1);
+	unset($a1);
+	$a2[0][0]++;
+	var_dump($a2);
+}
+function test_everything()
+{
+	$obj=new stdClass;
+	$obj->val=123;
+	$value=10;
+
+
+	$a=[$obj,$obj,'objref'=>&$obj,$value,'value'=>$value,10,9,'ref'=>&$value];
+	$a['selfref']=&$a;
+	$a['selfcop']=$a;
+	$a2=deep_copy($a);
+	var_dump($a);
+	echo str_repeat("-",80),PHP_EOL;
+	unset($a);
+	$o=&$a2['objref'];
+	$v2=&$a2['ref'];
+	var_dump($a2);
+
+}
 function test_deepcopy_mem_leak2()
 {
 
 	printf("%.3fKB\n",memory_get_usage()/1024.0);
 	$first=memory_get_usage();
 	// test_deepcopy_object_reference();
+	for ($i=0;$i<10;++$i)
 	test_deep_copy_recursive_reference();
 	// test_deep_copy_variable_reference();
 	// test_deep_copy_variable_reference2();

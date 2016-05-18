@@ -1,6 +1,6 @@
 #include "phpx.h"
 //ZEND_BEGIN_ARG_INFO(phpx_byref, pass_rest_by_reference)
-// #define PHPX_DEBUG 
+#define PHPX_DEBUG 
 #ifdef PHPX_DEBUG
 #define say(...) do { printf(__VA_ARGS__); fflush(stdout); } while (0)
 #endif
@@ -288,7 +288,7 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
             printf("already cloned, returning from object pool.\n");
             fflush(stdout);
             #endif
-            ZVAL_COPY(out,cloned_obj);
+            ZVAL_COPY(out,cloned_obj); //same object
             return 0;
         }
         else //new object
@@ -300,7 +300,7 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
             if (!isCloneable(var))
             {
                 php_error_docref("phpx",E_NOTICE,"Attempting to deep copy an uncloneable object.");
-                ZVAL_COPY_VALUE(out,var); //copy zval
+                ZVAL_COPY_VALUE(out,var); //copy zval, same object
             }
             else 
                 ZVAL_OBJ(out,zend_objects_clone_obj((zval *)var)); //clone
@@ -357,7 +357,8 @@ PHP_FUNCTION(deep_copy)
     #else
     int res=deep_copy_intern_ex(Z_REFVAL_P(var),return_value,&ht,&object_pool,0);
     #ifdef PHPX_DEBUG
-    printf("A total number of %d elements were copied.\n",res);
+    printf("Deep Copy: A total number of %d elements were copied.\n",res);
+    fflush(stdout);
     #endif
     #endif
     
