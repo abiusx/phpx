@@ -227,7 +227,7 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
     zend_ulong id=zval_id(var);
     #ifdef PHPX_DEBUG
     for (int i=0;i<depth;++i) printf("\t");
-    printf("\tGoing to check pool for id %llu... ",id);
+    printf("Going to check pool for id %llu... ",id);
     fflush(stdout);
     #endif
     zval *copy;
@@ -239,7 +239,8 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
         printf("Already available with id (%llu) and type (%d), returning.\n",id,zval_get_type(copy));   
         fflush(stdout);
         #endif
-        ZVAL_COPY(out,copy);
+        ZVAL_COPY_VALUE(out,copy);
+        // ZVAL_COPY(out,copy);
         return 0; //no element actually copied
     }
     #ifdef PHPX_DEBUG
@@ -248,10 +249,30 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
     #endif
     if (Z_TYPE_P(var)==IS_ARRAY)
     {
+        // printf("%p",out);
+        // say("-yoyo-");
+        // zval *__z = (out);                                        
+        // say("-yo1-");
+        // zend_array *_arr =(zend_array *) emalloc(sizeof(zend_array));             
+        // say("-yo2-");
+        // Z_ARR_P(__z) = _arr;                                    
+        // say("-yo3-");
+        // Z_TYPE_INFO_P(__z) = IS_ARRAY_EX;            
+        // say("-yo4-");
+        // // ZVAL_NEW_ARR(out);
+        say("It's an array, initing...");   
         array_init(out); 
+        say("done.\n");   
+        // SEPARATE_ARRAY(out);
         zend_array *arr = Z_ARRVAL_P(var);
+        say("Now counting its elements...\n");   
         int i=zend_array_count(arr);
         int res=0;
+        #ifdef PHPX_DEBUG
+        for (int i=0;i<depth;++i) printf("\t");
+        printf("Going to copy array with %d elements.\n",i);   
+        fflush(stdout);
+        #endif        
         if (i > 0) 
         {
             zend_string *key;
@@ -261,14 +282,31 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
             Z_ADDREF_P(out); //this is needed because out was added to array above.
             ZEND_HASH_FOREACH_KEY_VAL_IND(arr, index, key, data) 
             {
+                #ifdef PHPX_DEBUG
+                for (int i=0;i<depth;++i) printf("\t");
+                printf("Element with index: ");   
+                if (!key)
+                    printf("%d\n",index);
+                else
+                    printf("%s\n",ZSTR_VAL(key));
+                fflush(stdout);
+                #endif                        
                 zval tmp;
                 ZVAL_NULL(&tmp);
                 res+=deep_copy_intern_ex(data,&tmp,pool,object_pool,depth+1);
+                //add_*_zval does not adjust refcount
                 if (!key)
                     add_index_zval(out,index,&tmp); //copied into array
                 else
-                    add_assoc_zval(out,key->val,&tmp);
+                {
+                    add_assoc_zval(out,ZSTR_VAL(key),&tmp);
+
+                }
+                // if (Z_TYPE(tmp)!=IS_ARRAY)
                 zval_dtor(&tmp);
+                    //^ culprit
+                // else
+                    // printf("Nono!\n"),fflush(stdout);
             } ZEND_HASH_FOREACH_END();        
         }
         return res+1;
@@ -279,7 +317,7 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
         zend_ulong handle=Z_OBJ_HANDLE_P(var);
         #ifdef PHPX_DEBUG
         for (int i=0;i<depth;++i) printf("\t");
-        printf("\tDeep copying object #%llu: ",handle);
+        printf("Deep copying object #%llu: ",handle);
         fflush(stdout);
         #endif
         if ((cloned_obj=zend_hash_index_find(object_pool,handle)))
@@ -300,10 +338,14 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
             if (!isCloneable(var))
             {
                 php_error_docref("phpx",E_NOTICE,"Attempting to deep copy an uncloneable object.");
-                ZVAL_COPY_VALUE(out,var); //copy zval, same object
+                // ZVAL_COPY_VALUE(out,var); //copy zval value, same zval
+                ZVAL_COPY(out,var); //copy zval, same object
             }
             else 
+            {
                 ZVAL_OBJ(out,zend_objects_clone_obj((zval *)var)); //clone
+                // Z_ADDREF_P(out);
+            }
             zend_hash_index_add_new(object_pool,handle,out);
             Z_ADDREF_P(out);
         }
@@ -326,7 +368,8 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
         if (Z_TYPE_P(var)==IS_RESOURCE)
             php_error_docref("phpx",E_NOTICE,"Attempting to deep copy a resource.");
         
-        ZVAL_COPY(out, var);
+        // ZVAL_COPY(out, var);
+        ZVAL_DUP(out, var);
         // Z_ADDREF_P(out); //not here. is done by pool check
         zend_hash_index_add_new(pool,id,out); //cache this zval
         return 1;
@@ -363,8 +406,8 @@ PHP_FUNCTION(deep_copy)
     #endif
     
 
-    zend_hash_destroy(&ht); //most leakage is here (about 30%)
-    zend_hash_destroy(&object_pool); //and some here (about 10%)
+    // zend_hash_destroy(&ht); //most leakage is here (about 30%)
+    // zend_hash_destroy(&object_pool); //and some here (about 10%)
     //the rest of (60%) leakage is in deep_copy_intern's mallocs
     #ifdef DEEPCOPY_OLD
     RETURN_ZVAL(out,1,0 );

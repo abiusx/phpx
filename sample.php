@@ -1,20 +1,85 @@
 <?php
-
-test_array2() or die;
-test_everything() or die;
-test_deepcopy_mem_leak() or die;
-test_deepcopy_mem_leak2() or die;
+test_deepcopy_basic1() or die;
+// test_stress_deepcopy() or die;
+// test_array4() or die;
+// deep_copy($GLOBALS); die();
+// test_deepcopy_mem_leak3() or die;
+// test_array3() or die;
+// test_everything() or die;
+// test_deepcopy_mem_leak2() or die;
+// test_deepcopy_mem_leak() or die;
 
 // test_deep_copy_recursive_reference() or die;
 // test_deepcopy_object_reference() or die;
 // test_deep_copy_variable_reference() or die;
 // test_deep_copy_variable_reference2() or die;
 die();
+function test_deepcopy_basic1()
+{
+	$a=[1,2,3];
+	$a2=deep_copy($a);
+	$a[0]++;
+	var_dump($a2);
+}
+function test_stress_deepcopy()
+{
+	$a=[];
+	$a[]=$a;
+	$a[]=$a;
+	$a[]=$a;
+
+	$a2=deep_copy($a);
+	// unset($a2);
+	$a3=deep_copy($a);
+	unset($a3);
+	$a4=deep_copy($a);
+	unset($a4);
+	var_dump($a2);
+}
+function test_deepcopy_mem_leak3()
+{
+
+	printf("%.3fKB\n",memory_get_usage()/1024.0);
+	$first=memory_get_usage();
+	// test_deepcopy_object_reference();
+	$a=[1,2,3,4,5];
+	$a[]=$a;
+	$a[]=$a;
+	$a[]=$a;
+	for ($i=0;$i<1;++$i)
+		deep_copy($a);
+		// test_array3();
+	printf("%.3fKB\n",$first/1024.0);
+	printf("%.3fKB\n",memory_get_usage()/1024.0);
+}
+function test_array4()
+{
+	$a=[1,2,3,4,5];
+	$a[]=$a;
+	$a[]=$a;
+	$a[]=$a;
+	// $a[]=$a;
+	for ($i=0;$i<20;++$i)
+	$a2=deep_copy($a);
+	var_dump($a2);
+}
+function test_array3()
+{
+	// $a=[0,'z'=>1,'x'=>2,'y'=>3,4];
+	$a=[0,1,2,'x'=>3,4];
+	// $a['ref']=&$a;
+	$a['val']=$a;
+	$a2=deep_copy($a);
+	$a[0]++;
+	var_dump($a);
+	unset($a);
+	var_dump($a2);
+}
 function test_array2()
 {
 	$a=[0,1,2,3];
-	$a[]=$a;
-	$a[]=&$a;
+	// $a['ref']=&$a;
+	$a['val']=$a;
 
 	$a2=deep_copy($a);
 	$a[1]++;
@@ -41,9 +106,11 @@ function test_everything()
 	$value=10;
 
 
-	$a=[$obj,$obj,'objref'=>&$obj,$value,'value'=>$value,10,9,'ref'=>&$value];
+	$a=[
+	$obj,$obj,'objref'=>&$obj,
+	$value,'value'=>$value,10,9,'ref'=>&$value];
+	$a['selfval']=$a;
 	$a['selfref']=&$a;
-	$a['selfcop']=$a;
 	$a2=deep_copy($a);
 	var_dump($a);
 	echo str_repeat("-",80),PHP_EOL;
@@ -88,6 +155,7 @@ function test_deepcopy_object_reference()
 	// $fp=fopen("/tmp/tmp","wt");
 	$o2=$o;
 	$a=['a'=>$o,$o,&$o,$o,$o2,&$o];
+	$a=['a'=>$o,$o];//,$o,&$o,$o,$o2,&$o];
 	// $a=[$o,$o,&$o,$o,$o2];
 	$a2=deep_copy($a);
 	$o->a++;
