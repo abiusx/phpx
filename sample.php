@@ -1,5 +1,33 @@
 <?php
+// var_dump(get_declared_classes());
+// foreach (get_declared_classes() as $class)
+// {
+// 	$r=new ReflectionClass($class);
+// 	if (!$r->isCloneable())
+// 		echo $class,PHP_EOL;
+// }
+// die();
+function test_all()
+{
+foreach (get_defined_functions()['user'] as $function)
+	if (substr($function,0,5)=="test_" and $function!=__FUNCTION__)
+	{
+		echo $function,":",PHP_EOL;
+		$function();
+	}
+
+}
+test_all() or test_deepcopy_stress2() or die;
+// test_unclonable() or die;
 // test_objectarray() or die;
+function test_unclonable()
+{
+	$x=new Exception;
+	$a=[$x];
+	$y=deep_copy($x);
+	$x->y=5;
+	var_dump($y);
+}
 test_deepcopy_stress2() or die;
 function test_deepcopy_stress2()
 {
