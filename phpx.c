@@ -170,7 +170,7 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
     {
         int res=deep_copy_intern_ex(Z_REFVAL_P(var),out,pool,object_pool,depth+1);
         ZVAL_NEW_REF(out,out); //make it a reference again
-        Z_ADDREF_P(out); //this is the fix
+        // Z_ADDREF_P(out); //this is the culprit for the leak
         
         zend_hash_index_add_new(pool,id,out); //cache reference
         Z_ADDREF_P(out); //this is the fix
@@ -184,8 +184,6 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
         // ZVAL_COPY(out, var); //refcount++ in here
         ZVAL_DUP(out, var); //inherent refcount++ OR ctor call
         zend_hash_index_add_new(pool,id,out); //cache this zval
-        // if (Z_REFCOUNTED_P(out)) //otherwise primitive types like ints and floats crash
-        //     Z_ADDREF_P(out); 
         Z_TRY_ADDREF_P(out);
         return 1;
     } 
@@ -197,9 +195,6 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
 PHP_FUNCTION(deep_copy)
 {
     zval *var;
-    #ifdef DEEPCOPY_OLD
-    zval *out;
-    #endif
     if (zend_parse_parameters(ZEND_NUM_ARGS(), "z", &var) == FAILURE) {
         return;
     }
@@ -210,23 +205,16 @@ PHP_FUNCTION(deep_copy)
     zend_hash_init(&object_pool, 16, NULL, ZVAL_PTR_DTOR, 0);
 
     ///unwrap one level of referencing, because reference is sent to this function
-    #ifdef DEEPCOPY_OLD
-    out=deep_copy_intern(Z_REFVAL_P(var),&ht,&object_pool,0);
-    #else
     int res=deep_copy_intern_ex(Z_REFVAL_P(var),return_value,&ht,&object_pool,0);
     #ifdef PHPX_DEBUG
     printf("Deep Copy: A total number of %d elements were copied.\n",res);
     fflush(stdout);
-    #endif
     #endif
     
 
     zend_hash_destroy(&ht); //most leakage is here (about 30%)
     zend_hash_destroy(&object_pool); //and some here (about 10%)
     //the rest of (60%) leakage is in deep_copy_intern's mallocs
-    #ifdef DEEPCOPY_OLD
-    RETURN_ZVAL(out,1,0 );
-    #endif
 }
 
 PHP_MSHUTDOWN_FUNCTION(phpx)

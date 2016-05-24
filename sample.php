@@ -1,21 +1,21 @@
 <?php
-// var_dump(get_declared_classes());
-// foreach (get_declared_classes() as $class)
-// {
-// 	$r=new ReflectionClass($class);
-// 	if (!$r->isCloneable())
-// 		echo $class,PHP_EOL;
-// }
-// die();
+function list_unclonables()
+{
+	foreach (get_declared_classes() as $class)
+	{
+		$r=new ReflectionClass($class);
+		if (!$r->isCloneable())
+			echo $class,PHP_EOL;
+	}
+}
 function test_all()
 {
-foreach (get_defined_functions()['user'] as $function)
-	if (substr($function,0,5)=="test_" and $function!=__FUNCTION__)
-	{
-		echo $function,":",PHP_EOL;
-		$function();
-	}
-
+	foreach (get_defined_functions()['user'] as $function)
+		if (substr($function,0,5)=="test_" and $function!=__FUNCTION__)
+		{
+			echo $function,":",PHP_EOL;
+			$function();
+		}
 }
 test_all() or test_deepcopy_stress2() or die;
 // test_unclonable() or die;
