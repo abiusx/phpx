@@ -45,8 +45,6 @@ static int isCloneable(const zval *obj)
         return Z_OBJ_HANDLER_P(obj, clone_obj) != NULL;
     }
 }
-
-
 int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *object_pool,int depth)
 {
     //it seems like object pool is not really needed. zval pool covers it.
@@ -64,14 +62,16 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
     zval *copy;
     if ((copy=zend_hash_index_find(pool,id)))
     { 
-        if (Z_ISREF_P(copy))
-            Z_ADDREF_P(copy); //basically this copy is a copy of the ref, so we need +1 refcount
+        // if (Z_ISREF_P(copy))
+        // // if (Z_REFCOUNTED_P(copy)) //anything that can be addreffed, should be addreffed
+        //     Z_ADDREF_P(copy); //basically this copy is a copy of the ref, so we need +1 refcount
+        // ZVAL_COPY_VALUE(out,copy);
         #ifdef PHPX_DEBUG
         printf("Already available with id (%llu) and type (%d), returning.\n",id,zval_get_type(copy));   
         fflush(stdout);
         #endif
-        ZVAL_COPY_VALUE(out,copy);
-        // ZVAL_COPY(out,copy); //this does addref if needed.
+        
+        ZVAL_COPY(out,copy); //this does addref if supported.
         return 0; //no element actually copied
     }
     #ifdef PHPX_DEBUG
@@ -102,7 +102,7 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
                 for (int i=0;i<depth;++i) printf("\t");
                 printf("Element with index: ");   
                 if (!key)
-                    printf("%d\n",index);
+                    printf("%llu\n",index);
                 else
                     printf("%s\n",ZSTR_VAL(key));
                 fflush(stdout);
@@ -115,6 +115,7 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
                     add_index_zval(out,index,&tmp); //copied into array
                 else
                     add_assoc_zval(out,ZSTR_VAL(key),&tmp);
+                // Z_TRY_ADDREF(tmp); //no need to add ref with add_*_zval
                 // Z_ADDREF_P(&tmp);
                 // zval_dtor(&tmp);
             } ZEND_HASH_FOREACH_END();        
@@ -183,8 +184,9 @@ int deep_copy_intern_ex(const zval *var,zval * out,HashTable *pool,HashTable *ob
         // ZVAL_COPY(out, var); //refcount++ in here
         ZVAL_DUP(out, var); //inherent refcount++ OR ctor call
         zend_hash_index_add_new(pool,id,out); //cache this zval
-        if (Z_REFCOUNTED_P(out)) //otherwise primitive types like ints and floats crash
-            Z_ADDREF_P(out); 
+        // if (Z_REFCOUNTED_P(out)) //otherwise primitive types like ints and floats crash
+        //     Z_ADDREF_P(out); 
+        Z_TRY_ADDREF_P(out);
         return 1;
     } 
     return 0;

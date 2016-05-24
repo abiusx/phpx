@@ -1,13 +1,15 @@
 <?php
-// test_deepcopy_stress2() or die;
+// test_objectarray() or die;
+test_deepcopy_stress2() or die;
 function test_deepcopy_stress2()
 {
 	printf("%.3fKB\n",memory_get_usage()/1024.0);
 	$first=memory_get_usage();
 	ob_start();
-	for ($i=0;$i<1000;++$i)
-		test_everything();
+	for ($i=0;$i<200;++$i)
+		test_objectarray2();
 	ob_get_clean();
+	gc_collect_cycles();
 	printf("%.3fKB\n",$first/1024.0);
 	printf("%.3fKB\n",memory_get_usage()/1024.0);	
 }
@@ -17,7 +19,7 @@ function test_deepcopy_stress2()
 // deep_copy($GLOBALS); die();
 // test_deepcopy_mem_leak3() or die;
 // test_array3() or die;
-test_everything() or die;
+// test_everything() or die;
 // test_deepcopy_mem_leak2() or die;
 // test_deepcopy_mem_leak() or die;
 
@@ -26,6 +28,25 @@ test_everything() or die;
 // test_deep_copy_variable_reference() or die;
 // test_deep_copy_variable_reference2() or die;
 die();
+function test_objectarray2()
+{
+	$obj=new stdClass;
+	$val=str_repeat("-",10000);
+
+	$a=[
+	$val
+	// $obj
+	];
+	$a[]=$a;
+	$a[]=&$a;
+	$a2=deep_copy($a);
+	var_dump($a);
+	unset($a);
+	var_dump($a2);
+	unset($a2);
+
+	echo "all done.";
+}
 function test_deepcopy_basic7()
 {
 	$_a=[];
@@ -161,6 +182,17 @@ function test_array_copy()
 	$a2[0][0]++;
 	var_dump($a2);
 }
+function test_objectarray()
+{
+	$obj=new stdClass;
+	$a=[$obj];
+	$a[]=$a;
+	$a2=deep_copy($a);
+	unset($a);
+	var_dump($a2);
+	unset($a2);
+	echo 'all done.\n';
+}
 function test_everything()
 {
 	$obj=new stdClass;
@@ -169,8 +201,10 @@ function test_everything()
 
 
 	$a=[
-	$obj,$obj,'objref'=>&$obj,
-	$value,'value'=>$value,10,9,'ref'=>&$value];
+	$obj
+	,$obj,'objref'=>&$obj
+	,$value,'value'=>$value,10,9,'ref'=>&$value
+	];
 	$a['selfval']=$a;
 	$a['selfref']=&$a;
 	$a2=deep_copy($a);
